@@ -1,0 +1,262 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Trekmania</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <style>
+        :root {
+            --primary-blue: #007bff;
+            --bg-color: #f4f6f8;
+            --card-bg: #ffffff;
+            --text-main: #333333;
+            --text-muted: #888888;
+            --border-color: #e0e0e0;
+        }
+
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; margin: 0; background-color: var(--bg-color); color: var(--text-main); overflow-x: hidden; }
+
+        /* LOGIN SCREEN */
+        #login-screen { display: flex; flex-direction: column; justify-content: center; align-items: center; height: 100vh; background-color: var(--card-bg); padding: 20px; }
+        .auth-form { width: 100%; max-width: 350px; display: flex; flex-direction: column; gap: 15px; }
+        .auth-form h1 { text-align: center; color: var(--primary-blue); margin-bottom: 20px; }
+        .auth-form input { padding: 12px; border: 1px solid var(--border-color); border-radius: 8px; font-size: 16px; }
+        .auth-form button { padding: 14px; background-color: var(--primary-blue); color: white; border: none; border-radius: 8px; font-size: 16px; font-weight: bold; cursor: pointer; transition: 0.2s; }
+        .auth-form button.secondary { background-color: transparent; color: var(--primary-blue); border: 2px solid var(--primary-blue); }
+
+        /* MAIN APP */
+        #main-app { display: none; padding-bottom: 70px; }
+        .app-header { background-color: var(--card-bg); padding: 15px 20px; font-size: 20px; font-weight: bold; border-bottom: 1px solid var(--border-color); position: sticky; top: 0; z-index: 10; }
+        .app-section { display: none; padding: 15px; animation: fadeIn 0.3s ease; }
+        .app-section.active { display: block; }
+        @keyframes fadeIn { from { opacity: 0; transform: translateY(5px); } to { opacity: 1; transform: translateY(0); } }
+
+        /* CARDS & FEED */
+        .card { background-color: var(--card-bg); border-radius: 12px; padding: 15px; margin-bottom: 15px; box-shadow: 0 2px 5px rgba(0,0,0,0.05); }
+        .post-header { display: flex; align-items: center; gap: 10px; margin-bottom: 10px; }
+        .avatar { width: 40px; height: 40px; background-color: var(--primary-blue); color: white; border-radius: 50%; display: flex; justify-content: center; align-items: center; font-weight: bold; text-transform: uppercase; }
+        .post-stats { display: flex; gap: 20px; font-size: 14px; color: var(--text-muted); margin-top: 10px; }
+
+        /* FORMS */
+        .form-group { display: flex; flex-direction: column; gap: 5px; margin-bottom: 15px; }
+        .form-group input { padding: 10px; border: 1px solid var(--border-color); border-radius: 6px; }
+        .submit-btn { width: 100%; padding: 12px; background-color: var(--primary-blue); color: white; border: none; border-radius: 8px; font-weight: bold; font-size: 16px; cursor: pointer; }
+
+        /* BOTTOM NAV */
+        .bottom-nav { position: fixed; bottom: 0; width: 100%; background-color: var(--card-bg); border-top: 1px solid var(--border-color); display: flex; justify-content: space-around; padding: 10px 0; z-index: 100; }
+        .nav-item { display: flex; flex-direction: column; align-items: center; color: var(--text-muted); background: none; border: none; cursor: pointer; font-size: 12px; gap: 5px; }
+        .nav-item i { font-size: 20px; }
+        .nav-item.active { color: var(--primary-blue); }
+    </style>
+</head>
+<body>
+
+    <div id="login-screen">
+        <div class="auth-form">
+            <h1>Trekmania</h1>
+            <input type="email" id="email" placeholder="Email">
+            <input type="password" id="password" placeholder="Password (min 6 chars)">
+            <button id="login-btn">Log In</button>
+            <button id="signup-btn" class="secondary">Sign Up (New User)</button>
+            <p id="auth-error" style="color: red; font-size: 14px; text-align: center; display: none;"></p>
+        </div>
+    </div>
+
+    <div id="main-app">
+        <div class="app-header" id="header-title">Home</div>
+
+        <div id="home-tab" class="app-section active">
+            <div id="feed-container">
+                <p style="text-align:center; color: var(--text-muted);">Loading posts...</p>
+            </div>
+        </div>
+
+        <div id="trek-tab" class="app-section">
+            <div class="card">
+                <h3>Log a New Trek</h3>
+                <div class="form-group">
+                    <label>Trek Name</label>
+                    <input type="text" id="trek-name" placeholder="e.g. Leopard's Trail">
+                </div>
+                <div class="form-group">
+                    <label>Distance (km)</label>
+                    <input type="number" id="trek-distance" placeholder="e.g. 8.5">
+                </div>
+                <div class="form-group">
+                    <label>Time (hours)</label>
+                    <input type="number" id="trek-time" placeholder="e.g. 3.5">
+                </div>
+                <button id="post-trek-btn" class="submit-btn">Publish Post</button>
+            </div>
+        </div>
+
+        <div id="profile-tab" class="app-section">
+            <div class="card" style="display: flex; align-items: center; gap: 15px;">
+                <div class="avatar" id="profile-avatar" style="width: 60px; height: 60px; font-size: 24px;">U</div>
+                <div>
+                    <h2 style="margin: 0; font-size: 18px;" id="profile-email">Loading...</h2>
+                    <div style="font-size: 14px; color: var(--text-muted); margin-top: 5px;">Trekker Level 1</div>
+                </div>
+            </div>
+            <button id="logout-btn" style="width: 100%; padding: 12px; background: none; border: 1px solid red; color: red; border-radius: 8px; font-weight: bold; cursor: pointer;">Log Out</button>
+        </div>
+
+        <div class="bottom-nav">
+            <button class="nav-item active" data-target="home-tab" data-title="Home">
+                <i class="fa-solid fa-house"></i> Home
+            </button>
+            <button class="nav-item" data-target="trek-tab" data-title="Log Trek">
+                <i class="fa-solid fa-person-hiking"></i> Trek
+            </button>
+            <button class="nav-item" data-target="profile-tab" data-title="Profile">
+                <i class="fa-regular fa-user"></i> Profile
+            </button>
+        </div>
+    </div>
+
+    <script type="module">
+        // 1. Import Firebase functions
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-app.js";
+        import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-auth.js";
+        import { getFirestore, collection, addDoc, onSnapshot, query, orderBy, serverTimestamp } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-firestore.js";
+
+        // 2. Your Exact Firebase Configuration
+        const firebaseConfig = {
+            apiKey: "AIzaSyCUrzMwfSKvmcKFBYOF7uCL3M0ENUjAJUg",
+            authDomain: "trekmania-644bd.firebaseapp.com",
+            projectId: "trekmania-644bd",
+            storageBucket: "trekmania-644bd.firebasestorage.app",
+            messagingSenderId: "640274630515",
+            appId: "1:640274630515:web:09d00eed0c5b38638ea706",
+            measurementId: "G-58KT7CNVNY"
+        };
+
+        // 3. Initialize Firebase
+        const app = initializeApp(firebaseConfig);
+        const auth = getAuth(app);
+        const db = getFirestore(app);
+
+        // UI Elements
+        const loginScreen = document.getElementById('login-screen');
+        const mainApp = document.getElementById('main-app');
+        const emailInput = document.getElementById('email');
+        const passwordInput = document.getElementById('password');
+        const authError = document.getElementById('auth-error');
+        const feedContainer = document.getElementById('feed-container');
+        
+        // --- AUTHENTICATION LOGIC ---
+        
+        // Listen for logged-in status
+        onAuthStateChanged(auth, (user) => {
+            if (user) {
+                // User is signed in
+                loginScreen.style.display = 'none';
+                mainApp.style.display = 'block';
+                document.getElementById('profile-email').innerText = user.email;
+                document.getElementById('profile-avatar').innerText = user.email.charAt(0);
+                loadFeed(); // Fetch posts when logged in
+            } else {
+                // User is signed out
+                loginScreen.style.display = 'flex';
+                mainApp.style.display = 'none';
+            }
+        });
+
+        // Sign Up
+        document.getElementById('signup-btn').addEventListener('click', () => {
+            createUserWithEmailAndPassword(auth, emailInput.value, passwordInput.value)
+                .catch((error) => {
+                    authError.innerText = error.message;
+                    authError.style.display = 'block';
+                });
+        });
+
+        // Log In
+        document.getElementById('login-btn').addEventListener('click', () => {
+            signInWithEmailAndPassword(auth, emailInput.value, passwordInput.value)
+                .catch((error) => {
+                    authError.innerText = "Invalid email or password.";
+                    authError.style.display = 'block';
+                });
+        });
+
+        // Log Out
+        document.getElementById('logout-btn').addEventListener('click', () => {
+            signOut(auth);
+        });
+
+        // --- DATABASE LOGIC ---
+
+        // Create a Post
+        document.getElementById('post-trek-btn').addEventListener('click', async () => {
+            const name = document.getElementById('trek-name').value;
+            const distance = document.getElementById('trek-distance').value;
+            const time = document.getElementById('trek-time').value;
+
+            if(!name || !distance || !time) return alert("Please fill all fields!");
+
+            await addDoc(collection(db, "treks"), {
+                trekName: name,
+                distance: distance,
+                time: time,
+                userEmail: auth.currentUser.email,
+                createdAt: serverTimestamp()
+            });
+
+            // Clear form and show success
+            document.getElementById('trek-name').value = '';
+            document.getElementById('trek-distance').value = '';
+            document.getElementById('trek-time').value = '';
+            alert("Trek published!");
+            document.querySelector('[data-target="home-tab"]').click(); // switch to home tab
+        });
+
+        // Load Feed in Real-Time
+        function loadFeed() {
+            const q = query(collection(db, "treks"), orderBy("createdAt", "desc"));
+            
+            onSnapshot(q, (snapshot) => {
+                feedContainer.innerHTML = ""; // Clear loading text
+                if (snapshot.empty) {
+                    feedContainer.innerHTML = "<p style='text-align:center'>No treks yet. Be the first!</p>";
+                    return;
+                }
+
+                snapshot.forEach((doc) => {
+                    const post = doc.data();
+                    const card = document.createElement('div');
+                    card.className = 'card';
+                    card.innerHTML = `
+                        <div class="post-header">
+                            <div class="avatar">${post.userEmail.charAt(0)}</div>
+                            <div style="font-weight: bold; font-size: 14px;">${post.userEmail.split('@')[0]}</div>
+                        </div>
+                        <h3 style="margin: 10px 0 5px 0;">${post.trekName}</h3>
+                        <div class="post-stats">
+                            <div><strong>Time</strong><br>${post.time}h</div>
+                            <div><strong>Distance</strong><br>${post.distance} km</div>
+                        </div>
+                    `;
+                    feedContainer.appendChild(card);
+                });
+            });
+        }
+
+        // --- TAB NAVIGATION ---
+        document.querySelectorAll('.nav-item').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                // Hide all tabs
+                document.querySelectorAll('.app-section').forEach(section => section.classList.remove('active'));
+                document.querySelectorAll('.nav-item').forEach(nav => nav.classList.remove('active'));
+                
+                // Show clicked tab
+                const targetId = btn.getAttribute('data-target');
+                document.getElementById(targetId).classList.add('active');
+                btn.classList.add('active');
+                document.getElementById('header-title').innerText = btn.getAttribute('data-title');
+            });
+        });
+    </script>
+</body>
+</html>
