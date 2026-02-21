@@ -452,7 +452,18 @@
             onSnapshot(q, (snapshot) => {
                 const feedContainer = document.getElementById('feed-container');
                 feedContainer.innerHTML = "";
-                if (snapshot.empty) return feedContainer.innerHTML = "<p style='text-align:center'>No treks yet.</p>";
+                if (snapshot.empty) {
+                    return feedContainer.innerHTML = `
+                        <div style="text-align: center; padding: 50px 20px; display: flex; flex-direction: column; align-items: center; justify-content: center; height: 50vh;">
+                            <i class="fa-solid fa-mountain-sun" style="font-size: 64px; color: var(--primary-blue); margin-bottom: 20px; opacity: 0.8;"></i>
+                            <h2 style="color: var(--text-main); margin: 0 0 10px 0; font-size: 22px;">Welcome to the Trailhead! 🏔️</h2>
+                            <p style="color: var(--text-muted); margin: 0 0 25px 0; font-size: 15px; line-height: 1.5; max-width: 300px;">It's a little quiet here right now. Be the first to break the trail and share your latest adventure!</p>
+                            <button onclick="document.querySelector('[data-target=\\'trek-tab\\']').click()" style="padding: 14px 28px; background-color: var(--primary-blue); color: white; border: none; border-radius: 30px; font-weight: bold; font-size: 16px; cursor: pointer; box-shadow: 0 4px 15px rgba(0, 123, 255, 0.4); transition: 0.2s;">
+                                <i class="fa-solid fa-plus-circle" style="margin-right: 8px;"></i> Log Your First Trek
+                            </button>
+                        </div>
+                    `;
+                }
 
                 snapshot.forEach((postDoc) => {
                     const post = postDoc.data();
@@ -529,3 +540,4 @@
     </script>
 </body>
 </html>
+
