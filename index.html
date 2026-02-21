@@ -148,7 +148,6 @@
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-app.js";
         import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, onAuthStateChanged, signOut, updateProfile } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-auth.js";
-        // ADDED arrayUnion, arrayRemove, getDoc for interactive features
         import { getFirestore, collection, addDoc, onSnapshot, query, orderBy, serverTimestamp, doc, deleteDoc, setDoc, getDoc, getDocs, where, updateDoc, arrayUnion, arrayRemove } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-firestore.js";
 
         const firebaseConfig = {
@@ -181,7 +180,6 @@
                 if (user.photoURL) document.getElementById('profile-avatar-display').innerHTML = `<img src="${user.photoURL}">`;
                 else document.getElementById('profile-avatar-display').innerText = user.email.charAt(0).toUpperCase();
 
-                // Sync and retrieve initial profile stats safely
                 const userRef = doc(db, "users", user.uid);
                 const userDoc = await getDoc(userRef);
                 if (!userDoc.exists()) {
@@ -190,7 +188,6 @@
                     await setDoc(userRef, { username: displayUsername, photoURL: user.photoURL || "" }, { merge: true });
                 }
 
-                // Listen to My Profile Stats Live
                 onSnapshot(doc(db, "users", user.uid), (docSnapshot) => {
                     const data = docSnapshot.data();
                     if(data) {
@@ -199,7 +196,6 @@
                     }
                 });
 
-                // Listen to My Treks Count Live
                 onSnapshot(query(collection(db, "treks"), where("uid", "==", user.uid)), (snap) => {
                     document.getElementById('my-treks-count').innerText = snap.size;
                 });
@@ -268,7 +264,7 @@
                 userEmail: auth.currentUser.email, uid: auth.currentUser.uid,
                 authorName: auth.currentUser.displayName || auth.currentUser.email.split('@')[0], authorPic: auth.currentUser.photoURL || "",
                 mediaUrl: mediaUrl, mediaType: mediaType,
-                likes: [], comments: [], // NEW: Empty arrays for new posts
+                likes: [], comments: [],
                 createdAt: serverTimestamp()
             });
 
@@ -294,6 +290,28 @@
                     text: text.trim()
                 };
                 await updateDoc(trekRef, { comments: arrayUnion(commentData) });
+            }
+        };
+
+        // NEW: Share Function!
+        window.shareTrek = async function(trekName, time, elevation) {
+            const shareUrl = "https://azaaaaad.github.io/Trekmania/";
+            const shareText = `Check out this trek on Trekmania: ${trekName} (${time}h, ${elevation}m)!`;
+            
+            if (navigator.share) {
+                try {
+                    await navigator.share({
+                        title: 'Trekmania',
+                        text: shareText,
+                        url: shareUrl
+                    });
+                } catch (error) {
+                    console.log('Error sharing:', error);
+                }
+            } else {
+                // Fallback if browser doesn't support native sharing
+                navigator.clipboard.writeText(`${shareText} ${shareUrl}`);
+                alert("App link copied to clipboard!");
             }
         };
 
@@ -329,7 +347,6 @@
             document.getElementById('other-profile-username').innerText = targetUsername;
             document.getElementById('other-profile-avatar').innerHTML = targetPic ? `<img src="${targetPic}">` : targetUsername.charAt(0).toUpperCase();
 
-            // Set up Follow Button
             const followBtn = document.getElementById('follow-btn');
             followBtn.onclick = () => window.toggleFollow(targetUid);
             const myDoc = await getDoc(doc(db, "users", auth.currentUser.uid));
@@ -339,7 +356,6 @@
                 followBtn.innerText = "Follow"; followBtn.style.background = "var(--primary-blue)";
             }
 
-            // Listen to their stats live
             onSnapshot(doc(db, "users", targetUid), (docSnapshot) => {
                 const data = docSnapshot.data();
                 if(data) {
@@ -348,7 +364,6 @@
                 }
             });
 
-            // Fetch their posts
             const feedContainer = document.getElementById('other-user-feed-container');
             feedContainer.innerHTML = "<p style='text-align:center'>Loading posts...</p>";
             onSnapshot(query(collection(db, "treks"), where("uid", "==", targetUid)), (snap) => {
@@ -422,7 +437,6 @@
                     const displayPicHtml = post.authorPic ? `<img src="${post.authorPic}">` : (post.authorName || post.userEmail).charAt(0).toUpperCase();
                     const displayName = post.authorName || post.userEmail.split('@')[0];
 
-                    // Likes and Comments handling
                     const likesArray = post.likes || [];
                     const commentsArray = post.comments || [];
                     const isLiked = likesArray.includes(auth.currentUser.uid);
@@ -434,6 +448,9 @@
                             commentsArray.map(c => `<div class="comment-item"><strong>${c.authorName}:</strong> ${c.text}</div>`).join('') 
                         + `</div>`;
                     }
+
+                    // Escape quotes in trekName so it doesn't break the HTML onclick handler
+                    const safeTrekName = post.trekName.replace(/'/g, "\\'").replace(/"/g, "&quot;");
 
                     card.innerHTML = `
                         <div class="post-header">
@@ -452,6 +469,7 @@
                         <div class="post-actions">
                             <div class="action-btn ${isLiked ? 'liked' : ''}" onclick="toggleLike('${postDoc.id}', ${isLiked})"><i class="${likeClass} fa-thumbs-up"></i> ${likesArray.length}</div>
                             <div class="action-btn" onclick="addComment('${postDoc.id}')"><i class="fa-regular fa-comment"></i> ${commentsArray.length}</div>
+                            <div class="action-btn" onclick="shareTrek('${safeTrekName}', '${post.time}', '${post.elevation}')"><i class="fa-solid fa-share-nodes"></i> Share</div>
                         </div>
                         ${commentsHtml}
                     `;
