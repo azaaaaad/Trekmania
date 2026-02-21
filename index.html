@@ -10,9 +10,11 @@
         :root { --primary-blue: #007bff; --bg-color: #f4f6f8; --card-bg: #ffffff; --text-main: #333333; --text-muted: #888888; --border-color: #e0e0e0; --danger: #ff4d4f; }
         body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; margin: 0; background-color: var(--bg-color); color: var(--text-main); overflow-x: hidden; }
 
-        #login-screen { display: flex; flex-direction: column; justify-content: center; align-items: center; height: 100vh; background-color: var(--card-bg); padding: 20px; }
+        /* AUTH SCREENS (Login & Onboarding) */
+        #login-screen, #onboarding-screen { display: flex; flex-direction: column; justify-content: center; align-items: center; height: 100vh; background-color: var(--card-bg); padding: 20px; }
+        #onboarding-screen { display: none; } /* Hidden by default */
         .auth-form { width: 100%; max-width: 350px; display: flex; flex-direction: column; gap: 15px; }
-        .auth-form h1 { text-align: center; color: var(--primary-blue); margin-bottom: 20px; }
+        .auth-form h1, .auth-form h2 { text-align: center; color: var(--primary-blue); margin-bottom: 5px; }
         .auth-form input { padding: 12px; border: 1px solid var(--border-color); border-radius: 8px; font-size: 16px; }
         .auth-form button { padding: 14px; background-color: var(--primary-blue); color: white; border: none; border-radius: 8px; font-size: 16px; font-weight: bold; cursor: pointer; transition: 0.2s; }
         .auth-form button.secondary { background-color: transparent; color: var(--primary-blue); border: 2px solid var(--primary-blue); }
@@ -74,6 +76,15 @@
         </div>
     </div>
 
+    <div id="onboarding-screen">
+        <div class="auth-form">
+            <h2>Welcome to Trekmania! 🏔️</h2>
+            <p style="color: var(--text-muted); text-align: center; margin-bottom: 20px;">Pick a unique username to get started.</p>
+            <input type="text" id="onboarding-username" placeholder="Username (e.g. mountain_goat)">
+            <button id="complete-onboarding-btn">Complete Setup</button>
+        </div>
+    </div>
+
     <div id="main-app">
         <div class="app-header">
             <i class="fa-solid fa-arrow-left header-back-btn" id="header-back-btn"></i>
@@ -105,8 +116,6 @@
             <div class="card profile-header">
                 <div class="avatar profile-avatar" id="profile-avatar-display"></div>
                 <h2 style="margin: 0; font-size: 22px;">@<span id="profile-username">trekker</span></h2>
-                <div style="font-size: 14px; color: var(--text-muted);" id="profile-email">email@example.com</div>
-                
                 <div class="profile-stats-container">
                     <div class="stat-box"><span class="stat-number" id="my-treks-count">0</span><span>Treks</span></div>
                     <div class="stat-box"><span class="stat-number" id="my-followers-count">0</span><span>Followers</span></div>
@@ -167,47 +176,87 @@
 
         let previousTab = 'home-tab';
 
-        // --- AUTH & SYNC ---
+        // --- AUTH & SYNC (WITH NEW PRIVACY GATE) ---
         onAuthStateChanged(auth, async (user) => {
             if (user) {
                 document.getElementById('login-screen').style.display = 'none';
-                document.getElementById('main-app').style.display = 'block';
                 
-                const displayUsername = user.displayName || user.email.split('@')[0];
-                document.getElementById('profile-email').innerText = user.email;
-                document.getElementById('profile-username').innerText = displayUsername;
-                document.getElementById('edit-username-input').value = displayUsername;
-
-                if (user.photoURL) document.getElementById('profile-avatar-display').innerHTML = `<img src="${user.photoURL}">`;
-                else document.getElementById('profile-avatar-display').innerText = user.email.charAt(0).toUpperCase();
-
-                const userRef = doc(db, "users", user.uid);
-                const userDoc = await getDoc(userRef);
-                if (!userDoc.exists()) {
-                    await setDoc(userRef, { uid: user.uid, email: user.email, username: displayUsername, photoURL: user.photoURL || "", followers: [], following: [] });
+                // PRIVACY GATE: If they don't have a custom username yet, lock them in onboarding
+                if (!user.displayName) {
+                    document.getElementById('main-app').style.display = 'none';
+                    document.getElementById('onboarding-screen').style.display = 'flex';
                 } else {
-                    await setDoc(userRef, { username: displayUsername, photoURL: user.photoURL || "" }, { merge: true });
-                }
+                    // Normal Login
+                    document.getElementById('onboarding-screen').style.display = 'none';
+                    document.getElementById('main-app').style.display = 'block';
+                    
+                    const displayUsername = user.displayName; // NO MORE EMAIL FALLBACK
+                    document.getElementById('profile-username').innerText = displayUsername;
+                    document.getElementById('edit-username-input').value = displayUsername;
 
-                onSnapshot(doc(db, "users", user.uid), (docSnapshot) => {
-                    const data = docSnapshot.data();
-                    if(data) {
-                        document.getElementById('my-followers-count').innerText = data.followers?.length || 0;
-                        document.getElementById('my-following-count').innerText = data.following?.length || 0;
+                    if (user.photoURL) document.getElementById('profile-avatar-display').innerHTML = `<img src="${user.photoURL}">`;
+                    else document.getElementById('profile-avatar-display').innerText = displayUsername.charAt(0).toUpperCase();
+
+                    const userRef = doc(db, "users", user.uid);
+                    const userDoc = await getDoc(userRef);
+                    if (!userDoc.exists()) {
+                        await setDoc(userRef, { uid: user.uid, email: user.email, username: displayUsername, photoURL: user.photoURL || "", followers: [], following: [] });
+                    } else {
+                        await setDoc(userRef, { username: displayUsername, photoURL: user.photoURL || "" }, { merge: true });
                     }
-                });
 
-                onSnapshot(query(collection(db, "treks"), where("uid", "==", user.uid)), (snap) => {
-                    document.getElementById('my-treks-count').innerText = snap.size;
-                });
+                    onSnapshot(doc(db, "users", user.uid), (docSnapshot) => {
+                        const data = docSnapshot.data();
+                        if(data) {
+                            document.getElementById('my-followers-count').innerText = data.followers?.length || 0;
+                            document.getElementById('my-following-count').innerText = data.following?.length || 0;
+                        }
+                    });
 
-                loadFeed();
+                    onSnapshot(query(collection(db, "treks"), where("uid", "==", user.uid)), (snap) => {
+                        document.getElementById('my-treks-count').innerText = snap.size;
+                    });
+
+                    loadFeed();
+                }
             } else {
                 document.getElementById('login-screen').style.display = 'flex';
                 document.getElementById('main-app').style.display = 'none';
+                document.getElementById('onboarding-screen').style.display = 'none';
             }
         });
 
+        // --- ONBOARDING COMPLETION ---
+        document.getElementById('complete-onboarding-btn').addEventListener('click', async () => {
+            const chosenName = document.getElementById('onboarding-username').value.trim();
+            if (!chosenName) return alert("Please enter a username!");
+
+            const btn = document.getElementById('complete-onboarding-btn');
+            btn.innerText = "Saving..."; btn.disabled = true;
+
+            try {
+                // Attach custom name to Auth
+                await updateProfile(auth.currentUser, { displayName: chosenName });
+                
+                // Create clean user profile in Database
+                await setDoc(doc(db, "users", auth.currentUser.uid), {
+                    uid: auth.currentUser.uid,
+                    email: auth.currentUser.email,
+                    username: chosenName,
+                    photoURL: "",
+                    followers: [],
+                    following: []
+                });
+                
+                // Reload the page instantly logs them in cleanly!
+                window.location.reload(); 
+            } catch (error) {
+                alert("Error setting username.");
+                btn.innerText = "Complete Setup"; btn.disabled = false;
+            }
+        });
+
+        // Login & Signup Triggers
         document.getElementById('signup-btn').addEventListener('click', () => { createUserWithEmailAndPassword(auth, document.getElementById('email').value, document.getElementById('password').value).catch((error) => { document.getElementById('auth-error').innerText = error.message; document.getElementById('auth-error').style.display = 'block'; }); });
         document.getElementById('login-btn').addEventListener('click', () => { signInWithEmailAndPassword(auth, document.getElementById('email').value, document.getElementById('password').value).catch(() => { document.getElementById('auth-error').innerText = "Invalid credentials."; document.getElementById('auth-error').style.display = 'block'; }); });
         document.getElementById('logout-btn').addEventListener('click', () => signOut(auth));
@@ -263,7 +312,8 @@
             await addDoc(collection(db, "treks"), {
                 trekName: name, elevation: elevation, time: time,
                 userEmail: auth.currentUser.email, uid: auth.currentUser.uid,
-                authorName: auth.currentUser.displayName || auth.currentUser.email.split('@')[0], authorPic: auth.currentUser.photoURL || "",
+                authorName: auth.currentUser.displayName, // NO FALLBACK
+                authorPic: auth.currentUser.photoURL || "",
                 mediaUrl: mediaUrl, mediaType: mediaType,
                 likes: [], comments: [],
                 createdAt: serverTimestamp()
@@ -287,32 +337,20 @@
                 const trekRef = doc(db, "treks", postId);
                 const commentData = {
                     uid: auth.currentUser.uid,
-                    authorName: auth.currentUser.displayName || auth.currentUser.email.split('@')[0],
+                    authorName: auth.currentUser.displayName, // NO FALLBACK
                     text: text.trim()
                 };
                 await updateDoc(trekRef, { comments: arrayUnion(commentData) });
             }
         };
 
-        // NEW: Share Function!
         window.shareTrek = async function(trekName, time, elevation) {
             const shareUrl = "https://azaaaaad.github.io/Trekmania/";
             const shareText = `Check out this trek on Trekmania: ${trekName} (${time}h, ${elevation}m)!`;
-            
             if (navigator.share) {
-                try {
-                    await navigator.share({
-                        title: 'Trekmania',
-                        text: shareText,
-                        url: shareUrl
-                    });
-                } catch (error) {
-                    console.log('Error sharing:', error);
-                }
+                try { await navigator.share({ title: 'Trekmania', text: shareText, url: shareUrl }); } catch (error) { console.log('Error sharing:', error); }
             } else {
-                // Fallback if browser doesn't support native sharing
-                navigator.clipboard.writeText(`${shareText} ${shareUrl}`);
-                alert("App link copied to clipboard!");
+                navigator.clipboard.writeText(`${shareText} ${shareUrl}`); alert("App link copied to clipboard!");
             }
         };
 
@@ -322,21 +360,18 @@
             const myDoc = await getDoc(myRef);
             
             const isFollowing = (myDoc.data().following || []).includes(targetUid);
-            
             if (isFollowing) {
                 await updateDoc(myRef, { following: arrayRemove(targetUid) });
                 await updateDoc(theirRef, { followers: arrayRemove(auth.currentUser.uid) });
-                document.getElementById('follow-btn').innerText = "Follow";
-                document.getElementById('follow-btn').style.background = "var(--primary-blue)";
+                document.getElementById('follow-btn').innerText = "Follow"; document.getElementById('follow-btn').style.background = "var(--primary-blue)";
             } else {
                 await updateDoc(myRef, { following: arrayUnion(targetUid) });
                 await updateDoc(theirRef, { followers: arrayUnion(auth.currentUser.uid) });
-                document.getElementById('follow-btn').innerText = "Unfollow";
-                document.getElementById('follow-btn').style.background = "var(--text-muted)";
+                document.getElementById('follow-btn').innerText = "Unfollow"; document.getElementById('follow-btn').style.background = "var(--text-muted)";
             }
         };
 
-        // --- GLOBAL FUNCTION TO VIEW OTHER PROFILES ---
+        // --- VIEW OTHER PROFILES ---
         window.viewUser = async function(targetUid, targetUsername, targetPic) {
             if (targetUid === auth.currentUser.uid) { document.querySelector('[data-target="profile-tab"]').click(); return; }
 
@@ -351,11 +386,8 @@
             const followBtn = document.getElementById('follow-btn');
             followBtn.onclick = () => window.toggleFollow(targetUid);
             const myDoc = await getDoc(doc(db, "users", auth.currentUser.uid));
-            if ((myDoc.data().following || []).includes(targetUid)) {
-                followBtn.innerText = "Unfollow"; followBtn.style.background = "var(--text-muted)";
-            } else {
-                followBtn.innerText = "Follow"; followBtn.style.background = "var(--primary-blue)";
-            }
+            if ((myDoc.data().following || []).includes(targetUid)) { followBtn.innerText = "Unfollow"; followBtn.style.background = "var(--text-muted)"; } 
+            else { followBtn.innerText = "Follow"; followBtn.style.background = "var(--primary-blue)"; }
 
             onSnapshot(doc(db, "users", targetUid), (docSnapshot) => {
                 const data = docSnapshot.data();
@@ -434,9 +466,10 @@
                         else mediaHtml = `<img src="${post.mediaUrl}" style="width: 100%; max-height: 400px; object-fit: cover; border-radius: 8px; margin-top: 10px;">`;
                     }
 
+                    // Fallback to "Anonymous" only if it's an old test post from before the update
                     const displayPicUrl = post.authorPic ? post.authorPic : "";
-                    const displayPicHtml = post.authorPic ? `<img src="${post.authorPic}">` : (post.authorName || post.userEmail).charAt(0).toUpperCase();
-                    const displayName = post.authorName || post.userEmail.split('@')[0];
+                    const displayName = post.authorName || "Anonymous Trekker";
+                    const displayPicHtml = post.authorPic ? `<img src="${post.authorPic}">` : displayName.charAt(0).toUpperCase();
 
                     const likesArray = post.likes || [];
                     const commentsArray = post.comments || [];
@@ -450,7 +483,6 @@
                         + `</div>`;
                     }
 
-                    // Escape quotes in trekName so it doesn't break the HTML onclick handler
                     const safeTrekName = post.trekName.replace(/'/g, "\\'").replace(/"/g, "&quot;");
 
                     card.innerHTML = `
@@ -497,4 +529,3 @@
     </script>
 </body>
 </html>
-
