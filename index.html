@@ -29,6 +29,7 @@
         .post-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 10px; }
         .post-user-info { display: flex; align-items: center; gap: 10px; }
         .avatar { width: 40px; height: 40px; background-color: var(--primary-blue); color: white; border-radius: 50%; display: flex; justify-content: center; align-items: center; font-weight: bold; text-transform: uppercase; overflow: hidden; }
+        .avatar img { width: 100%; height: 100%; object-fit: cover; }
         .post-stats { display: flex; gap: 20px; font-size: 14px; color: var(--text-muted); margin-top: 10px; }
         
         /* ACTIONS */
@@ -51,6 +52,9 @@
         .profile-stats-container { display: flex; justify-content: space-around; width: 100%; margin-top: 15px; padding-top: 15px; border-top: 1px solid var(--border-color); }
         .stat-box { display: flex; flex-direction: column; align-items: center; font-size: 14px; color: var(--text-muted); }
         .stat-number { font-size: 20px; font-weight: bold; color: var(--text-main); }
+        
+        /* EDIT PROFILE SECTION */
+        #edit-profile-section { display: none; background-color: #f9f9f9; padding: 15px; border-radius: 10px; margin-top: 15px; border: 1px solid var(--border-color); }
 
         /* BOTTOM NAV */
         .bottom-nav { position: fixed; bottom: 0; width: 100%; background-color: var(--card-bg); border-top: 1px solid var(--border-color); display: flex; justify-content: space-around; padding: 10px 0; z-index: 100; }
@@ -108,7 +112,7 @@
 
         <div id="profile-tab" class="app-section">
             <div class="card profile-header">
-                <div class="avatar profile-avatar" id="profile-avatar-display">U</div>
+                <div class="avatar profile-avatar" id="profile-avatar-display"></div>
                 <h2 style="margin: 0; font-size: 22px;">@<span id="profile-username">trekker</span></h2>
                 <div style="font-size: 14px; color: var(--text-muted);" id="profile-email">email@example.com</div>
                 
@@ -126,7 +130,23 @@
                         <span>Following</span>
                     </div>
                 </div>
+
+                <button id="toggle-edit-btn" style="margin-top: 15px; padding: 8px 20px; background: var(--bg-color); border: 1px solid var(--border-color); border-radius: 20px; font-weight: bold; cursor: pointer;">Edit Profile</button>
             </div>
+
+            <div id="edit-profile-section">
+                <h4 style="margin-top: 0;">Update Profile</h4>
+                <div class="form-group">
+                    <label>New Username</label>
+                    <input type="text" id="edit-username-input" placeholder="Enter new username">
+                </div>
+                <div class="form-group">
+                    <label>Profile Picture</label>
+                    <input type="file" id="edit-pic-input" accept="image/*">
+                </div>
+                <button id="save-profile-btn" class="submit-btn" style="padding: 10px; font-size: 14px;">Save Changes</button>
+            </div>
+
             <button id="logout-btn" style="width: 100%; padding: 12px; background: none; border: 1px solid var(--border-color); color: var(--danger); border-radius: 8px; font-weight: bold; cursor: pointer; margin-top: 10px;">Log Out</button>
         </div>
 
@@ -145,10 +165,10 @@
 
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-app.js";
-        import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, onAuthStateChanged, signOut } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-auth.js";
+        // ADDED updateProfile to imports!
+        import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, onAuthStateChanged, signOut, updateProfile } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-auth.js";
         import { getFirestore, collection, addDoc, onSnapshot, query, orderBy, serverTimestamp, doc, deleteDoc } from "https://www.gstatic.com/firebasejs/10.8.1/firebase-firestore.js";
 
-        // Your Firebase Configuration
         const firebaseConfig = {
             apiKey: "AIzaSyCUrzMwfSKvmcKFBYOF7uCL3M0ENUjAJUg",
             authDomain: "trekmania-644bd.firebaseapp.com",
@@ -163,14 +183,28 @@
         const auth = getAuth(app);
         const db = getFirestore(app);
 
-        // --- AUTHENTICATION ---
+        // --- AUTHENTICATION & PROFILE DISPLAY ---
         onAuthStateChanged(auth, (user) => {
             if (user) {
                 document.getElementById('login-screen').style.display = 'none';
                 document.getElementById('main-app').style.display = 'block';
+                
+                // Load Email
                 document.getElementById('profile-email').innerText = user.email;
-                document.getElementById('profile-username').innerText = user.email.split('@')[0];
-                document.getElementById('profile-avatar-display').innerText = user.email.charAt(0);
+                
+                // Load Custom Username (or default to email prefix)
+                const displayUsername = user.displayName || user.email.split('@')[0];
+                document.getElementById('profile-username').innerText = displayUsername;
+                document.getElementById('edit-username-input').value = displayUsername;
+
+                // Load Custom Profile Pic (or default letter)
+                const avatarDisplay = document.getElementById('profile-avatar-display');
+                if (user.photoURL) {
+                    avatarDisplay.innerHTML = `<img src="${user.photoURL}" alt="Profile Pic">`;
+                } else {
+                    avatarDisplay.innerText = user.email.charAt(0).toUpperCase();
+                }
+
                 loadFeed();
             } else {
                 document.getElementById('login-screen').style.display = 'flex';
@@ -190,7 +224,58 @@
 
         document.getElementById('logout-btn').addEventListener('click', () => signOut(auth));
 
-        // --- DATABASE & CLOUDINARY UPLOAD LOGIC ---
+        // --- EDIT PROFILE LOGIC ---
+        document.getElementById('toggle-edit-btn').addEventListener('click', () => {
+            const section = document.getElementById('edit-profile-section');
+            section.style.display = section.style.display === 'block' ? 'none' : 'block';
+        });
+
+        document.getElementById('save-profile-btn').addEventListener('click', async () => {
+            const newName = document.getElementById('edit-username-input').value;
+            const newPicFile = document.getElementById('edit-pic-input').files[0];
+            const btn = document.getElementById('save-profile-btn');
+
+            let finalPhotoUrl = auth.currentUser.photoURL; // Keep old photo if not changing
+
+            btn.innerText = "Saving Profile...";
+            btn.disabled = true;
+
+            // Upload new pic to Cloudinary if they chose one
+            if (newPicFile) {
+                const formData = new FormData();
+                formData.append("file", newPicFile);
+                formData.append("upload_preset", "trekmania_preset");
+
+                try {
+                    const res = await fetch(`https://api.cloudinary.com/v1_1/difuiqzph/image/upload`, { method: "POST", body: formData });
+                    const data = await res.json();
+                    if(data.secure_url) {
+                        finalPhotoUrl = data.secure_url;
+                    }
+                } catch (error) {
+                    alert("Failed to upload profile picture.");
+                }
+            }
+
+            // Update Firebase Auth Profile
+            await updateProfile(auth.currentUser, {
+                displayName: newName,
+                photoURL: finalPhotoUrl
+            });
+
+            // Refresh UI immediately
+            document.getElementById('profile-username').innerText = newName;
+            if (finalPhotoUrl) {
+                document.getElementById('profile-avatar-display').innerHTML = `<img src="${finalPhotoUrl}" alt="Profile Pic">`;
+            }
+
+            btn.innerText = "Save Changes";
+            btn.disabled = false;
+            document.getElementById('edit-profile-section').style.display = 'none'; // Hide form
+            alert("Profile updated successfully!");
+        });
+
+        // --- DATABASE POSTING LOGIC ---
         document.getElementById('post-trek-btn').addEventListener('click', async () => {
             const name = document.getElementById('trek-name').value;
             const elevation = document.getElementById('trek-elevation').value;
@@ -203,53 +288,42 @@
             let mediaUrl = "";
             let mediaType = "";
 
-            // If user selected a file, upload to Cloudinary first
             if (mediaFile) {
                 submitBtn.innerText = "Uploading Media... Please wait.";
                 submitBtn.disabled = true;
-
                 const formData = new FormData();
                 formData.append("file", mediaFile);
-                formData.append("upload_preset", "trekmania_preset"); // The preset you just created
+                formData.append("upload_preset", "trekmania_preset");
 
                 try {
-                    // Decide if it's an image or video API endpoint
                     const resourceType = mediaFile.type.startsWith('video') ? 'video' : 'image';
-                    const cloudName = "difuiqzph"; // Your specific Cloudinary name
-
-                    const response = await fetch(`https://api.cloudinary.com/v1_1/${cloudName}/${resourceType}/upload`, {
-                        method: "POST",
-                        body: formData
-                    });
-                    
+                    const response = await fetch(`https://api.cloudinary.com/v1_1/difuiqzph/${resourceType}/upload`, { method: "POST", body: formData });
                     const data = await response.json();
-                    if(data.secure_url) {
-                        mediaUrl = data.secure_url;
-                        mediaType = resourceType;
-                    } else {
-                        throw new Error("Upload failed");
-                    }
+                    if(data.secure_url) { mediaUrl = data.secure_url; mediaType = resourceType; }
                 } catch (error) {
-                    alert("Media upload failed. Check your Cloudinary preset name!");
+                    alert("Media upload failed.");
                     submitBtn.innerText = "Publish Post";
                     submitBtn.disabled = false;
                     return;
                 }
             }
 
-            // Once media is done, save everything to Firebase
             submitBtn.innerText = "Saving Trek...";
             await addDoc(collection(db, "treks"), {
                 trekName: name,
                 elevation: elevation,
                 time: time,
                 userEmail: auth.currentUser.email,
+                
+                // NEW: Attach custom username and avatar to the post itself!
+                authorName: auth.currentUser.displayName || auth.currentUser.email.split('@')[0],
+                authorPic: auth.currentUser.photoURL || "",
+
                 mediaUrl: mediaUrl,
                 mediaType: mediaType,
                 createdAt: serverTimestamp()
             });
 
-            // Reset form and UI
             document.getElementById('trek-name').value = '';
             document.getElementById('trek-elevation').value = '';
             document.getElementById('trek-time').value = '';
@@ -279,21 +353,24 @@
                     const isOwner = post.userEmail === auth.currentUser.email;
                     const deleteHtml = isOwner ? `<i class="fa-solid fa-trash delete-btn" data-id="${postDoc.id}"></i>` : '';
 
-                    // Construct HTML for media if it exists
                     let mediaHtml = '';
                     if (post.mediaUrl) {
                         if (post.mediaType === 'video') {
                             mediaHtml = `<video src="${post.mediaUrl}" controls style="width: 100%; max-height: 400px; border-radius: 8px; margin-top: 10px; background: #000;"></video>`;
                         } else {
-                            mediaHtml = `<img src="${post.mediaUrl}" style="width: 100%; max-height: 400px; object-fit: cover; border-radius: 8px; margin-top: 10px;" alt="Trek Media">`;
+                            mediaHtml = `<img src="${post.mediaUrl}" style="width: 100%; max-height: 400px; object-fit: cover; border-radius: 8px; margin-top: 10px;">`;
                         }
                     }
+
+                    // NEW: Use the attached custom name and picture for the feed header
+                    const displayPic = post.authorPic ? `<img src="${post.authorPic}">` : post.userEmail.charAt(0).toUpperCase();
+                    const displayName = post.authorName || post.userEmail.split('@')[0];
 
                     card.innerHTML = `
                         <div class="post-header">
                             <div class="post-user-info">
-                                <div class="avatar">${post.userEmail.charAt(0)}</div>
-                                <div style="font-weight: bold; font-size: 15px;">@${post.userEmail.split('@')[0]}</div>
+                                <div class="avatar">${displayPic}</div>
+                                <div style="font-weight: bold; font-size: 15px;">@${displayName}</div>
                             </div>
                             ${deleteHtml}
                         </div>
@@ -311,12 +388,10 @@
                     feedContainer.appendChild(card);
                 });
 
-                // Attach delete listeners
                 document.querySelectorAll('.delete-btn').forEach(btn => {
                     btn.addEventListener('click', async (e) => {
                         if(confirm("Are you sure you want to delete this trek?")) {
-                            const docId = e.target.getAttribute('data-id');
-                            await deleteDoc(doc(db, "treks", docId));
+                            await deleteDoc(doc(db, "treks", e.target.getAttribute('data-id')));
                         }
                     });
                 });
